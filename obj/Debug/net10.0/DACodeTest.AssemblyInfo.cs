@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DACodeTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c1018ce4a5e6831bb1434f60feec6f289c6c7c9e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6234aa4c7e25487d2cbfea36f24e3a940f221760")]
 [assembly: System.Reflection.AssemblyProductAttribute("DACodeTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DACodeTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

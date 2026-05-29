@@ -1,0 +1,115 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Globalization;
+using System.Text;
+using HtmlAgilityPack;
+
+namespace DACodeTest
+{
+    public class CharacterCoordinates
+    {
+        public string? XCoord { get; set; }
+        public string? YCoord { get; set; }
+        public string? Character { get; set; }
+    }
+
+    static class TableParser
+    {
+        static void Main()
+        {
+            var web = new HtmlWeb();
+            var GoogleTable = web.Load("https://docs.google.com/document/u/4/d/e/2PACX-1vQiVT_Jj04V35C-YRzvoqyEYYzdXHcRyMUZCVQRYCu6gQJX7hbNhJ5eFCMuoX47cAsDW2ZBYppUQITr/pub");
+            var table = GoogleTable.DocumentNode.SelectSingleNode("//table");
+            if (table == null)
+                return;
+            var rows = table.SelectNodes(".//tr");
+            if (rows == null)
+                return;
+
+            var characterList = new List<CharacterCoordinates>();
+            foreach (var row in rows.Skip(1))
+            {
+                var cells = row.SelectNodes(".//td");
+                if (cells != null && cells.Count >= 3)
+                {
+                    var characterInfo = new CharacterCoordinates
+                    {
+                        XCoord = cells[0].InnerText.Trim(),
+                        YCoord = cells[2].InnerText.Trim(),
+                        Character = cells[1].InnerText.Trim()
+                    };
+                    characterList.Add(characterInfo);
+                }
+            }
+
+            double ParseDoubleOrInfinity(string? s)
+            {
+                if (string.IsNullOrWhiteSpace(s))
+                    return double.PositiveInfinity;
+                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ||
+                    double.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out d))
+                    return d;
+                return double.PositiveInfinity;
+            }
+
+            int TruncateOrMax(string? s)
+            {
+                if (string.IsNullOrWhiteSpace(s))
+                    return int.MaxValue;
+                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ||
+                    double.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out d))
+                    return (int)Math.Truncate(d);
+                return int.MaxValue;
+            }
+
+            string BuildCombinedByX(List<CharacterCoordinates> items)
+            {
+                var ordered = items.OrderBy(ch => ParseDoubleOrInfinity(ch?.XCoord)).ToList();
+                var entries = ordered.Select(ch => new { WholeX = TruncateOrMax(ch?.XCoord), Char = string.IsNullOrEmpty(ch?.Character) ? "" : ch.Character! }).ToList();
+                var finiteXs = entries.Where(e => e.WholeX != int.MaxValue).Select(e => e.WholeX).ToList();
+                if (!finiteXs.Any())
+                    return string.Concat(ordered.Select(o => o.Character ?? string.Empty));
+                int minX = finiteXs.Min();
+                int maxX = finiteXs.Max();
+                int startX = minX < 0 ? minX : 0;
+                var byWhole = entries.GroupBy(e => e.WholeX).ToDictionary(g => g.Key, g => g.Select(e => e.Char).ToList());
+                var sb = new StringBuilder();
+                for (int x = startX; x <= maxX; x++)
+                {
+                    if (byWhole.TryGetValue(x, out var charsAtX))
+                    {
+                        foreach (var c in charsAtX)
+                            sb.Append(c);
+                    }
+                    else
+                    {
+                        sb.Append(' ');
+                    }
+                }
+                return sb.ToString();
+            }
+
+            var groupedByWholeY = characterList
+                .GroupBy(c => TruncateOrMax(c?.YCoord))
+                .OrderBy(g => g.Key)
+                .Select(g => new
+                {
+                    WholeY = g.Key,
+                    Items = g.OrderBy(ch => ParseDoubleOrInfinity(ch?.XCoord)).ToList()
+                })
+                .Select(g => new
+                {
+                    g.WholeY,
+                    Items = g.Items,
+                    CombinedCharacters = BuildCombinedByX(g.Items)
+                });
+
+            foreach (var group in groupedByWholeY)
+            {
+                Console.WriteLine($"Whole Y: {group.WholeY}, Combined Characters: {group.CombinedCharacters}");
+            }
+        }
+    }
+}

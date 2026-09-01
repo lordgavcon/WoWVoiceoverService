@@ -24,12 +24,16 @@ local BASH_EVERY       = 90  -- ticks between bashes (~1.5s)
 local NOISE_RADIUS_OPEN = 20 -- world-sound radius of the rattle
 local NOISE_RADIUS_BASH = 25 -- bashing wakes the whole street
 
--- Landed bashes needed to break a secured door, by tier.
-local BASH_HITS = {
-    [BNS.Tier.CIVILIAN] = 12,
-    [BNS.Tier.THUG]     = 8,
-    [BNS.Tier.MILITIA]  = 6,
+-- Damage dealt per bash, by tier. Bashing works against the door's
+-- actual durability, so a reinforced or metal door takes far longer to
+-- breach than a flimsy interior one.
+local BASH_DAMAGE = {
+    [BNS.Tier.CIVILIAN] = 25,
+    [BNS.Tier.THUG]     = 40,
+    [BNS.Tier.MILITIA]  = 60,
 }
+local DEFAULT_DOOR_HP = 300 -- plain wood door, when the engine exposes no health
+local GIVE_UP_BASHES  = 60  -- ~90s of hammering: this door is too strong, leave
 
 -- Programs that justify breaking a door down rather than giving up.
 local PURSUIT = {
@@ -129,6 +133,49 @@ local function openDoor(zombie, door)
     if door.setOpened then pcall(function() door:setOpened(true) end) end
 end
 
+-- How hard this bandit hits a door: tier base, half again with a
+-- proper breaching tool in hand.
+local function bashDamage(brain)
+    local dmg = BASH_DAMAGE[brain.tier] or 25
+    local w = brain.weapon
+    if w and not w.gun and w.item
+            and (w.item:find("Axe") or w.item:find("Sledge")) then
+        dmg = dmg * 1.5
+    end
+    return dmg
+end
+
+local function maxHealthOf(door)
+    for _, getter in ipairs({ "getMaxHealth", "getHealth" }) do
+        if door[getter] then
+            local ok, v = pcall(function() return door[getter](door) end)
+            if ok and type(v) == "number" and v > 0 then return v end
+        end
+    end
+    return DEFAULT_DOOR_HP
+end
+
+-- Apply one bash's damage against the door's durability; returns the
+-- remaining health. Uses the engine's own health when it's writable
+-- (player-built IsoThumpables, engine doors that expose it), otherwise
+-- a virtual pool in the door's mod data — which persists, so partial
+-- damage survives the bandit being driven off and coming back.
+local function damageDoor(door, amount)
+    if door.getHealth and door.setHealth then
+        local ok, hp = pcall(function() return door:getHealth() end)
+        if ok and type(hp) == "number" then
+            hp = hp - amount
+            pcall(function() door:setHealth(hp) end)
+            return hp
+        end
+    end
+    local md = door.getModData and door:getModData() or nil
+    if not md then return 0 end
+    if md.BNS_DoorHP == nil then md.BNS_DoorHP = maxHealthOf(door) end
+    md.BNS_DoorHP = md.BNS_DoorHP - amount
+    return md.BNS_DoorHP
+end
+
 local function smashDoor(zombie, door)
     BNS.Locks.onDoorDestroyed(door)
     zombie:playSound("WoodDoorBreak")
@@ -157,15 +204,30 @@ function BNS.Doors.tick(zombie, brain)
 
     st.noiseTimer = st.noiseTimer - 1
     if st.bash then
+        -- Only a bandit with a reason keeps swinging: target lost or
+        -- program moved on means the break-in ends here.
+        if not PURSUIT[brain.program] then
+            brain.door = nil
+            return false
+        end
         if st.noiseTimer <= 0 then
             st.noiseTimer = BASH_EVERY
             st.bashCount = st.bashCount + 1
             BNS.Anim.pulse(zombie, brain, "swing")
             zombie:playSound("ZombieThumpGeneric")
             addSound(zombie, zombie:getX(), zombie:getY(), zombie:getZ(), NOISE_RADIUS_BASH, 40)
-            if st.bashCount >= (BASH_HITS[brain.tier] or 12) then
+            local remaining = damageDoor(door, bashDamage(brain))
+            if remaining <= 0 then
                 smashDoor(zombie, door)
                 brain.door = nil
+                return false
+            end
+            if st.bashCount >= GIVE_UP_BASHES then
+                -- Too strong: give up and go around.
+                brain.door = nil
+                if brain.program == BNS.Program.WANDER then
+                    brain.targetX, brain.targetY = nil, nil
+                end
                 return false
             end
         end

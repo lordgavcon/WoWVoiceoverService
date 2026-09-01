@@ -10,6 +10,7 @@
 if isClient() then return end
 
 require "BNS/BNS_Core"
+require "BNS/BNS_Anim"
 
 BNS.Combat = {}
 
@@ -45,6 +46,7 @@ function BNS.Combat.melee(zombie, brain, player)
     local range = (brain.weapon and brain.weapon.range) or 1.3
     if d > range then return end
 
+    BNS.Anim.pulse(zombie, brain, "swing")
     zombie:playSound("BaseballBatHit")
     -- 70% to land; blocked/dodged otherwise.
     if ZombRand(100) < 70 then
@@ -63,17 +65,26 @@ function BNS.Combat.shoot(zombie, brain, player)
     local d = BNS.dist(zombie:getX(), zombie:getY(), player:getX(), player:getY())
     if d > w.range then return end
 
+    BNS.Anim.pulse(zombie, brain, "shoot")
     zombie:playSound(w.sound or "9mmShot")
     addSound(zombie, zombie:getX(), zombie:getY(), zombie:getZ(), 70, 70)
 
     local hitChance = (w.hit or 40) * (1.0 - 0.5 * (d / w.range))
     if player:isSneaking() then hitChance = hitChance * 0.6 end
+    -- The opening shot of an engagement goes wide far more often, so a
+    -- shouted warning is rarely followed by an instant kill.
+    if brain.firstShot then
+        hitChance = hitChance * 0.5
+        brain.firstShot = nil
+    end
     if ZombRand(100) < hitChance then
         applyDamage(player, w.dmg or 0.3)
     end
 end
 
 function BNS.Combat.attack(zombie, brain, player)
+    -- No damage before the warning shout has run its course.
+    if not brain.warned then return end
     if brain.weapon and brain.weapon.gun then
         BNS.Combat.shoot(zombie, brain, player)
     else

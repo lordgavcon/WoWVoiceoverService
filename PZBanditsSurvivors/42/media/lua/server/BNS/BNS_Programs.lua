@@ -10,6 +10,7 @@ if isClient() then return end
 
 require "BNS/BNS_Core"
 require "BNS/BNS_Combat"
+require "BNS/BNS_Anim"
 
 BNS.Programs = {}
 
@@ -35,6 +36,8 @@ function BNS.Programs.walkTo(zombie, x, y, z, run)
         zombie:pathToLocation(math.floor(x), math.floor(y), z or 0)
     end
     if zombie.setRunning then zombie:setRunning(run == true) end
+    local brain = BNS.brain(zombie)
+    if brain then BNS.Anim.set(zombie, brain, run and "run" or "walk") end
 end
 
 local function arrived(zombie, brain, dist)
@@ -152,23 +155,64 @@ end
 
 -- ATTACK ----------------------------------------------------------------
 
+-- Every fresh engagement opens with a warning shout and a short hold
+-- during which no damage is dealt, so armed bandits telegraph danger
+-- before the first shot or swing. The timer itself counts down every
+-- engine tick in BNS_Brain.
+local function warnLine(brain)
+    if brain.tier == BNS.Tier.MILITIA then return getText("UI_BNS_WarnMilitia") end
+    if brain.tier == BNS.Tier.THUG then return getText("UI_BNS_WarnThug") end
+    return getText("UI_BNS_WarnCivilian")
+end
+
+function BNS.Programs.startWarning(zombie, brain)
+    if brain.warned or brain.warnTimer then return end
+    brain.warnTimer = 150 -- ~2.5s
+    brain.firstShot = true
+    brain.speechCooldown = 0
+    BNS.Say(zombie, brain, warnLine(brain))
+end
+
+local function endEngagement(brain)
+    brain.warned = nil
+    brain.warnTimer = nil
+    brain.intent = nil
+    brain.program = brain.home and BNS.Program.DEFEND or BNS.Program.WANDER
+end
+
 BNS.Programs[BNS.Program.ATTACK] = function(zombie, brain, ctx)
     local p = ctx.player
     if not p or ctx.dist > 50 or p:isDead() then
-        brain.program = brain.home and BNS.Program.DEFEND or BNS.Program.WANDER
-        brain.intent = nil
+        endEngagement(brain)
         return
     end
+    BNS.Programs.startWarning(zombie, brain)
     local w = brain.weapon or {}
+    if not brain.warned then
+        -- Warning phase: gunners stand and level their weapon; melee
+        -- bandits keep closing but hold their swing.
+        if w.gun then
+            BNS.Anim.set(zombie, brain, "aim")
+        elseif ctx.dist > (w.range or 1.3) then
+            BNS.Programs.walkTo(zombie, p:getX(), p:getY(), p:getZ(), true)
+        else
+            BNS.Anim.set(zombie, brain, "idle")
+        end
+        return
+    end
     if w.gun then
         -- Keep distance and shoot; close only if the player hides.
         if ctx.dist > w.range * 0.8 then
             BNS.Programs.walkTo(zombie, p:getX(), p:getY(), p:getZ(), true)
+        else
+            BNS.Anim.set(zombie, brain, "aim")
         end
         BNS.Combat.attack(zombie, brain, p)
     else
         if ctx.dist > (w.range or 1.3) then
             BNS.Programs.walkTo(zombie, p:getX(), p:getY(), p:getZ(), true)
+        else
+            BNS.Anim.set(zombie, brain, "idle")
         end
         BNS.Combat.attack(zombie, brain, p)
     end

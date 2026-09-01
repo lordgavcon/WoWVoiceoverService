@@ -10,6 +10,9 @@ UI_EN = {
 	UI_BNS_TradeRejected = "The trader shakes their head. Not enough.",
 	UI_BNS_TradeAccepted = "Deal.",
 	UI_BNS_RobberyDemand = "Hand it over and nobody gets hurt!",
+	UI_BNS_WarnMilitia = "Contact! Drop your weapon, NOW!",
+	UI_BNS_WarnThug = "Wrong neighborhood, friend!",
+	UI_BNS_WarnCivilian = "Stay back! I mean it!",
 	UI_BNS_RobberyDone = "Pleasure doing business.",
 	UI_BNS_RaidWarning = "You hear shouting outside...",
 }

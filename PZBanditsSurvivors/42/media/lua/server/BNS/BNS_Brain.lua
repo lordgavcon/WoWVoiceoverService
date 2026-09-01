@@ -12,6 +12,7 @@ require "BNS/BNS_Core"
 require "BNS/BNS_Persistence"
 require "BNS/BNS_Spawner"
 require "BNS/BNS_Programs"
+require "BNS/BNS_Anim"
 
 BNS.Brain = {}
 
@@ -33,6 +34,15 @@ local function updateNPC(zombie, brain)
     if brain.speechCooldown and brain.speechCooldown > 0 then
         brain.speechCooldown = brain.speechCooldown - 1
     end
+    -- Warning shout hold: no damage until it runs out.
+    if brain.warnTimer then
+        brain.warnTimer = brain.warnTimer - 1
+        if brain.warnTimer <= 0 then
+            brain.warnTimer = nil
+            brain.warned = true
+        end
+    end
+    BNS.Anim.tick(zombie, brain)
     if brain.tick % TICK_DIVIDER ~= 0 then
         -- Between full ticks, keep attacking if mid-fight.
         if brain.program == BNS.Program.ATTACK or brain.program == BNS.Program.ROB then
@@ -54,8 +64,25 @@ local function updateNPC(zombie, brain)
         brain.program = BNS.Program.TRADE
     end
 
+    -- Out of combat, the warning state resets so the next engagement
+    -- opens with a fresh shout.
+    if brain.program == BNS.Program.WANDER or brain.program == BNS.Program.FLEE
+            or brain.program == BNS.Program.DEFEND then
+        brain.warned = nil
+        brain.warnTimer = nil
+    end
+
     local program = BNS.Programs[brain.program] or BNS.Programs[BNS.Program.WANDER]
     program(zombie, brain, ctx)
+
+    -- Anim decay: a shell that stopped moving shouldn't keep playing a
+    -- walk/run cycle (e.g. arrived at its path target between ticks).
+    local x, y = zombie:getX(), zombie:getY()
+    if brain.lastX and (brain.animMode == "walk" or brain.animMode == "run")
+            and BNS.dist(x, y, brain.lastX, brain.lastY) < 0.05 then
+        BNS.Anim.set(zombie, brain, "idle")
+    end
+    brain.lastX, brain.lastY = x, y
 
     -- Trickle position back into the persistent record.
     if brain.tick % (TICK_DIVIDER * 30) == 0 then
@@ -78,11 +105,17 @@ function BNS.Brain.onWeaponHitCharacter(attacker, target, weapon, damage)
     -- Engine damage numbers vary wildly by weapon; normalise to our scale.
     local amount = math.min((damage or 0.5) / 2.5, 0.9)
     BNS.Combat.damageNPC(target, brain, amount)
-    -- Bandits retaliate; neutrals turn hostile if attacked.
+    -- Bandits retaliate; neutrals turn hostile if attacked. Being hit
+    -- is its own warning: they still shout, but skip the hold.
     if brain.health > 0 then
         if brain.role ~= BNS.Role.BANDIT then brain.role = BNS.Role.BANDIT end
         brain.program = (brain.tier == BNS.Tier.CIVILIAN and brain.health < 0.4)
             and BNS.Program.FLEE or BNS.Program.ATTACK
+        if brain.program == BNS.Program.ATTACK and not brain.warned then
+            BNS.Programs.startWarning(target, brain)
+            brain.warnTimer = nil
+            brain.warned = true
+        end
     end
 end
 

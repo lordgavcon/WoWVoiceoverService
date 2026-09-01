@@ -22,11 +22,21 @@ stored in its mod data. That buys us the engine's real pathfinding
 (`pathToLocationF`) for natural navigation, and free multiplayer position
 sync (zombies already sync). Consequences you should know about:
 
-- NPC locomotion/animations are zombie animation sets — they walk and run
-  believably but won't visibly swing weapons or aim. Attacks are simulated
-  server-side (hit rolls, gunshot sounds and noise that attracts zombies,
-  body-part damage through `BodyDamage`).
+- NPCs play **player animation clips** (idle, walk, run, aim, melee swing,
+  pistol fire) through AnimSet overlay nodes in `media/AnimSets/zombie/`,
+  conditioned on `BNSNPC`/`BNSAnim` animation variables that the Lua brain
+  sets — zombies and players share a skeleton, so player clips apply
+  cleanly. Attack outcomes are still simulated server-side (hit rolls,
+  gunshot sounds and noise that attracts zombies, body-part damage through
+  `BodyDamage`); the animations are the visual layer on top.
 - NPCs read as zombies to some vanilla systems (e.g. kill counts).
+- **Warning shouts:** every fresh bandit engagement opens with a shouted
+  warning ("Drop your weapon, NOW!") and a ~2.5 second hold during which no
+  damage is dealt — gunners stand and aim, melee bandits close in without
+  swinging. The first shot of an engagement also takes a 50% accuracy
+  penalty, so armed bandits telegraph danger instead of instantly killing.
+  A bandit you attack first skips the hold (being shot at is its own
+  warning) but still shouts.
 
 ## Installation
 
@@ -76,6 +86,12 @@ clients.
   few calls (e.g. `setUseless`, `IsoBarricade.AddBarricadeToObject`,
   outfit names) may need renaming against the current javadocs. Everything
   is guarded where practical; check `console.txt` for `[BNS]` lines.
+- The `Bob_*` animation clip names in `media/AnimSets/zombie/*/bns_*.xml`
+  are best-known guesses; if NPCs still move like zombies in-game, correct
+  those names against the game's `media/anims_X/Bob/` clips first.
+- Animation variables are set server-side; if they turn out not to sync to
+  MP clients on 42.20, a client-side mirror pass fed by a periodic server
+  broadcast is the planned fallback.
 - NPCs don't loot buildings for themselves, use vehicles, or fight zombies
   intelligently (they rely on toughness).
 - Trader stock doesn't restock over time yet.

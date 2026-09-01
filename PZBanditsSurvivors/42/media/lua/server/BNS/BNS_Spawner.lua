@@ -12,6 +12,7 @@ if isClient() then return end
 require "BNS/BNS_Core"
 require "BNS/BNS_Loadouts"
 require "BNS/BNS_Persistence"
+require "BNS/BNS_Anim"
 
 BNS.Spawner = {}
 
@@ -76,6 +77,7 @@ function BNS.Spawner.materialise(rec)
     }
     rec.weapon = brain.weapon
     zombie:getModData().BNS = brain
+    BNS.Anim.init(zombie, brain)
 
     -- Show the weapon in hand.
     if brain.weapon and brain.weapon.item then

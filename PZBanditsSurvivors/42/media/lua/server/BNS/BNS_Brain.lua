@@ -13,6 +13,8 @@ require "BNS/BNS_Persistence"
 require "BNS/BNS_Spawner"
 require "BNS/BNS_Programs"
 require "BNS/BNS_Anim"
+require "BNS/BNS_ZombieThreat"
+require "BNS/BNS_Doors"
 
 BNS.Brain = {}
 
@@ -43,23 +45,66 @@ local function updateNPC(zombie, brain)
         end
     end
     BNS.Anim.tick(zombie, brain)
-    if brain.tick % TICK_DIVIDER ~= 0 then
-        -- Between full ticks, keep attacking if mid-fight.
-        if brain.program == BNS.Program.ATTACK or brain.program == BNS.Program.ROB then
-            local p, d = BNS.nearestPlayer(zombie:getX(), zombie:getY())
-            if p and brain.program == BNS.Program.ATTACK then
-                BNS.Combat.attack(zombie, brain, p)
-            end
+    -- Held by a zombie: struggle in place, no moving or attacking until
+    -- the grip breaks (the ~1/s threat scan below keeps applying the
+    -- crowd's scratches while held).
+    local held = false
+    if brain.grabbedTimer then
+        brain.grabbedTimer = brain.grabbedTimer - 1
+        if brain.grabbedTimer <= 0 then
+            brain.grabbedTimer = nil
+            BNS.Anim.set(zombie, brain, "idle")
+        else
+            held = true
         end
+    end
+    -- Door work: rattling one open, or bashing a secured one down.
+    -- Combat and being grabbed trump housebreaking.
+    local doorBusy = false
+    if brain.door then
+        if held or brain.program == BNS.Program.FIGHTZ
+                or brain.program == BNS.Program.FLEE then
+            BNS.Doors.abort(brain)
+        else
+            doorBusy = BNS.Doors.tick(zombie, brain)
+        end
+    end
+    if brain.tick % TICK_DIVIDER ~= 0 then
+        if held or doorBusy then return end
+        -- Between full ticks, keep attacking if mid-fight.
+        if brain.program == BNS.Program.ATTACK then
+            local p = BNS.nearestPlayer(zombie:getX(), zombie:getY())
+            if p then BNS.Combat.attack(zombie, brain, p) end
+        elseif brain.program == BNS.Program.FIGHTZ then
+            local t = BNS.ZombieThreat.targets[brain.id]
+            if t and not t:isDead() then BNS.Combat.attackZombie(zombie, brain, t) end
+        end
+        return
+    end
+
+    -- Zombie threat scan roughly once per second (full ticks are one
+    -- per TICK_DIVIDER engine ticks).
+    brain.threatTick = (brain.threatTick or ZombRand(6)) + 1
+    if brain.threatTick >= 6 then
+        brain.threatTick = 0
+        local verdict, nearest, centroid = BNS.ZombieThreat.scan(zombie, brain)
+        BNS.ZombieThreat.apply(zombie, brain, verdict, nearest, centroid)
+    end
+    if held then return end
+
+    if doorBusy then
+        BNS.Persistence.syncFromShell(zombie)
         return
     end
 
     local player, dist = BNS.nearestPlayer(zombie:getX(), zombie:getY())
     local ctx = { player = player, dist = dist or 999999 }
 
-    -- Survivors and traders don't fight players; zombies scare everyone.
+    -- Survivors and traders don't fight players — but they do fight
+    -- zombies, and zombies scare everyone.
     if brain.role ~= BNS.Role.BANDIT
             and brain.program ~= BNS.Program.FLEE
+            and brain.program ~= BNS.Program.FIGHTZ
             and brain.program ~= BNS.Program.TRADE then
         brain.program = BNS.Program.TRADE
     end
@@ -78,9 +123,26 @@ local function updateNPC(zombie, brain)
     -- Anim decay: a shell that stopped moving shouldn't keep playing a
     -- walk/run cycle (e.g. arrived at its path target between ticks).
     local x, y = zombie:getX(), zombie:getY()
-    if brain.lastX and (brain.animMode == "walk" or brain.animMode == "run")
-            and BNS.dist(x, y, brain.lastX, brain.lastY) < 0.05 then
+    local stalled = brain.lastX and BNS.dist(x, y, brain.lastX, brain.lastY) < 0.05
+    if stalled and (brain.animMode == "walk" or brain.animMode == "run") then
         BNS.Anim.set(zombie, brain, "idle")
+    end
+    -- Stalled bandit in a program that wants to move: probably a closed
+    -- door in the way — start working it after two stalled full ticks.
+    local wantsMove = brain.program == BNS.Program.WANDER
+        or brain.program == BNS.Program.APPROACH
+        or brain.program == BNS.Program.ATTACK
+        or brain.program == BNS.Program.ROB
+        or brain.program == BNS.Program.RAID
+        or brain.program == BNS.Program.DEFEND
+    if stalled and wantsMove and BNS.isBandit(zombie) and not brain.door then
+        brain.stallTicks = (brain.stallTicks or 0) + 1
+        if brain.stallTicks >= 2 then
+            brain.stallTicks = 0
+            BNS.Doors.tryStart(zombie, brain)
+        end
+    else
+        brain.stallTicks = 0
     end
     brain.lastX, brain.lastY = x, y
 
@@ -126,6 +188,7 @@ function BNS.Brain.onZombieDead(zombie)
     if not brain then return end
     BNS.Spawner.dropLoot(zombie, brain)
     BNS.Persistence.remove(brain.id)
+    BNS.ZombieThreat.targets[brain.id] = nil
     if isServer() then
         sendServerCommand(BNS.CommandModule, "npcDead", { id = brain.id })
     end

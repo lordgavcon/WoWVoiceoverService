@@ -17,27 +17,29 @@ BNS.Anim = {}
 BNS.Anim.Modes = {
     idle = true, walk = true, run = true,
     aim = true, swing = true, shoot = true,
+    hit = true,     -- one-shot flinch when a zombie lands a hit
+    grabbed = true, -- sustained struggle while held by a zombie
 }
 
--- Sustained modes: idle / walk / run / aim.
+-- Sustained modes: idle / walk / run / aim / grabbed. The base mode is
+-- tracked separately from pulses so a one-shot flinch can never eat a
+-- sustained state (e.g. a hit landing while grabbed).
 function BNS.Anim.set(zombie, brain, mode)
     if not BNS.Anim.Modes[mode] then mode = "idle" end
-    -- A pulse in flight keeps the variable until its timer clears it.
-    if brain.animPulse and brain.animPulse > 0 then
-        brain.animAfterPulse = mode
-        return
-    end
+    brain.animBase = mode
+    -- A pulse in flight keeps the variable until its timer restores base.
+    if brain.animPulse and brain.animPulse > 0 then return end
     if brain.animMode == mode then return end
     brain.animMode = mode
     zombie:setVariable("BNSAnim", mode)
 end
 
--- One-shot modes: swing / shoot. Holds the variable for roughly one
--- clip length, then falls back to the last sustained mode.
+-- One-shot modes: swing / shoot / hit. Holds the variable for roughly
+-- one clip length, then falls back to the sustained base mode.
 function BNS.Anim.pulse(zombie, brain, mode)
     if not BNS.Anim.Modes[mode] then return end
+    brain.animBase = brain.animBase or "idle"
     brain.animPulse = 45 -- ~0.75s at 60 ticks/s
-    brain.animAfterPulse = brain.animMode or "idle"
     brain.animMode = mode
     zombie:setVariable("BNSAnim", mode)
 end
@@ -48,8 +50,7 @@ function BNS.Anim.tick(zombie, brain)
         brain.animPulse = brain.animPulse - 1
         if brain.animPulse <= 0 then
             brain.animPulse = nil
-            brain.animMode = brain.animAfterPulse or "idle"
-            brain.animAfterPulse = nil
+            brain.animMode = brain.animBase or "idle"
             zombie:setVariable("BNSAnim", brain.animMode)
         end
     end
@@ -59,5 +60,6 @@ end
 function BNS.Anim.init(zombie, brain)
     zombie:setVariable("BNSNPC", "true")
     brain.animMode = "idle"
+    brain.animBase = "idle"
     zombie:setVariable("BNSAnim", "idle")
 end

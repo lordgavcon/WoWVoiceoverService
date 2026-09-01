@@ -12,6 +12,7 @@ require "BNS/BNS_Core"
 require "BNS/BNS_Loadouts"
 require "BNS/BNS_Persistence"
 require "BNS/BNS_Programs"
+require "BNS/BNS_Locks"
 
 BNS.Commands = {}
 
@@ -142,6 +143,9 @@ function BNS.Commands.onClientCommand(module, command, player, args)
     if command == "requestTrade" then BNS.Commands.requestTrade(player, args)
     elseif command == "doTrade" then BNS.Commands.doTrade(player, args)
     elseif command == "talk" then BNS.Commands.talk(player, args)
+    elseif command == "attachLock" then BNS.Locks.attachLock(player, args)
+    elseif command == "removeLock" then BNS.Locks.removeLock(player, args)
+    elseif command == "useLock" then BNS.Locks.useLock(player, args)
     end
 end
 

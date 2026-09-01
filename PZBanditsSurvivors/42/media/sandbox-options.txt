@@ -71,3 +71,9 @@ option BNS.NPCDamageMultiplier
 	type = double, min = 0.1, max = 5.0, default = 1.0,
 	page = BNS, translation = BNS_NPCDamageMultiplier,
 }
+
+option BNS.DoorOpenDelay
+{
+	type = integer, min = 1, max = 10, default = 3,
+	page = BNS, translation = BNS_DoorOpenDelay,
+}

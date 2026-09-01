@@ -13,6 +13,13 @@ UI_EN = {
 	UI_BNS_WarnMilitia = "Contact! Drop your weapon, NOW!",
 	UI_BNS_WarnThug = "Wrong neighborhood, friend!",
 	UI_BNS_WarnCivilian = "Stay back! I mean it!",
+	UI_BNS_WarnFarmer = "Get off my land!",
+	UI_BNS_WarnPolice = "Police! Weapon on the ground, NOW!",
+	UI_BNS_LastStand = "Come on then! I'm not running!",
+	UI_BNS_AttachLock = "Attach combination lock",
+	UI_BNS_RemoveLock = "Remove combination lock",
+	UI_BNS_UseLock = "Open/Close (combination)",
+	UI_BNS_LockedDoor = "Combination lock - you don't know the code",
 	UI_BNS_RobberyDone = "Pleasure doing business.",
 	UI_BNS_RaidWarning = "You hear shouting outside...",
 }

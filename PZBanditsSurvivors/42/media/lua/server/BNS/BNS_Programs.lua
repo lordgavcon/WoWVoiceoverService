@@ -227,13 +227,21 @@ BNS.Programs[BNS.Program.FLEE] = function(zombie, brain, ctx)
     brain.fleeUntil = (brain.fleeUntil or 600) - 1
     if brain.fleeUntil <= 0 then
         brain.fleeUntil = nil
+        brain.fleeFrom = nil
         brain.program = BNS.Program.WANDER
         return
     end
-    local p = ctx.player
-    if p then
-        local dx = zombie:getX() - p:getX()
-        local dy = zombie:getY() - p:getY()
+    -- Run from the recorded threat (a zombie mob's centroid) when there
+    -- is one; otherwise from the nearest player.
+    local fx, fy
+    if brain.fleeFrom then
+        fx, fy = brain.fleeFrom.x, brain.fleeFrom.y
+    elseif ctx.player then
+        fx, fy = ctx.player:getX(), ctx.player:getY()
+    end
+    if fx then
+        local dx = zombie:getX() - fx
+        local dy = zombie:getY() - fy
         local d = math.max(BNS.dist(0, 0, dx, dy), 0.1)
         BNS.Programs.walkTo(zombie, zombie:getX() + dx / d * 20, zombie:getY() + dy / d * 20, 0, true)
     end

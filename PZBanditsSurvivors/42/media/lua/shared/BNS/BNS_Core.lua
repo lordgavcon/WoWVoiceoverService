@@ -36,6 +36,7 @@ BNS.Program = {
     RAID     = "raid",
     DEFEND   = "defend",
     TRADE    = "trade",
+    FIGHTZ   = "fightz", -- fighting off real zombies
 }
 
 -- Sandbox --------------------------------------------------------------

@@ -13,6 +13,7 @@ require "BNS/BNS_Persistence"
 require "BNS/BNS_Spawner"
 require "BNS/BNS_Programs"
 require "BNS/BNS_Anim"
+require "BNS/BNS_ZombieThreat"
 
 BNS.Brain = {}
 
@@ -43,23 +44,50 @@ local function updateNPC(zombie, brain)
         end
     end
     BNS.Anim.tick(zombie, brain)
+    -- Held by a zombie: struggle in place, no moving or attacking until
+    -- the grip breaks (the ~1/s threat scan below keeps applying the
+    -- crowd's scratches while held).
+    local held = false
+    if brain.grabbedTimer then
+        brain.grabbedTimer = brain.grabbedTimer - 1
+        if brain.grabbedTimer <= 0 then
+            brain.grabbedTimer = nil
+            BNS.Anim.set(zombie, brain, "idle")
+        else
+            held = true
+        end
+    end
     if brain.tick % TICK_DIVIDER ~= 0 then
+        if held then return end
         -- Between full ticks, keep attacking if mid-fight.
-        if brain.program == BNS.Program.ATTACK or brain.program == BNS.Program.ROB then
-            local p, d = BNS.nearestPlayer(zombie:getX(), zombie:getY())
-            if p and brain.program == BNS.Program.ATTACK then
-                BNS.Combat.attack(zombie, brain, p)
-            end
+        if brain.program == BNS.Program.ATTACK then
+            local p = BNS.nearestPlayer(zombie:getX(), zombie:getY())
+            if p then BNS.Combat.attack(zombie, brain, p) end
+        elseif brain.program == BNS.Program.FIGHTZ then
+            local t = BNS.ZombieThreat.targets[brain.id]
+            if t and not t:isDead() then BNS.Combat.attackZombie(zombie, brain, t) end
         end
         return
     end
 
+    -- Zombie threat scan roughly once per second (full ticks are one
+    -- per TICK_DIVIDER engine ticks).
+    brain.threatTick = (brain.threatTick or ZombRand(6)) + 1
+    if brain.threatTick >= 6 then
+        brain.threatTick = 0
+        local verdict, nearest, centroid = BNS.ZombieThreat.scan(zombie, brain)
+        BNS.ZombieThreat.apply(zombie, brain, verdict, nearest, centroid)
+    end
+    if held then return end
+
     local player, dist = BNS.nearestPlayer(zombie:getX(), zombie:getY())
     local ctx = { player = player, dist = dist or 999999 }
 
-    -- Survivors and traders don't fight players; zombies scare everyone.
+    -- Survivors and traders don't fight players — but they do fight
+    -- zombies, and zombies scare everyone.
     if brain.role ~= BNS.Role.BANDIT
             and brain.program ~= BNS.Program.FLEE
+            and brain.program ~= BNS.Program.FIGHTZ
             and brain.program ~= BNS.Program.TRADE then
         brain.program = BNS.Program.TRADE
     end
@@ -126,6 +154,7 @@ function BNS.Brain.onZombieDead(zombie)
     if not brain then return end
     BNS.Spawner.dropLoot(zombie, brain)
     BNS.Persistence.remove(brain.id)
+    BNS.ZombieThreat.targets[brain.id] = nil
     if isServer() then
         sendServerCommand(BNS.CommandModule, "npcDead", { id = brain.id })
     end

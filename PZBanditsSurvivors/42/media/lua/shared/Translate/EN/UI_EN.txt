@@ -15,6 +15,7 @@ UI_EN = {
 	UI_BNS_WarnCivilian = "Stay back! I mean it!",
 	UI_BNS_WarnFarmer = "Get off my land!",
 	UI_BNS_WarnPolice = "Police! Weapon on the ground, NOW!",
+	UI_BNS_LastStand = "Come on then! I'm not running!",
 	UI_BNS_RobberyDone = "Pleasure doing business.",
 	UI_BNS_RaidWarning = "You hear shouting outside...",
 }

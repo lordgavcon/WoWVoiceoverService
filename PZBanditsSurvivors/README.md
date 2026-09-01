@@ -13,6 +13,7 @@ Adds persistent, world-navigating human NPCs to Build 42.20+:
   Raid squads and POI garrisons are themed the same way, based on where the base sits.
 - **Base raids & sabotage** — bandit squads periodically march on player bases (MP safehouses are detected directly; elsewhere the mod learns where you spend your time). Raiders smash barricades and player-built walls, shut down and damage generators, and steal from your containers before withdrawing.
 - **Fortified points of interest** — the militia claims a configurable number of known locations (fire stations, gas stations, warehouses, gun stores across Rosewood, Muldraugh, West Point, Riverside, March Ridge…). Claimed POIs get barricaded windows/doors, supply-stocked containers (food, ammo, meds, fuel, building materials) and a standing garrison. Clear the garrison and the supplies are yours.
+- **The living vs the dead** — all NPCs (bandits, survivors, traders) treat zombies as the real enemy. Zombies within 5 tiles pre-empt whatever an NPC was doing — even a firefight with you — and get put down with the NPC's actual weapon (gunfire draws more zombies in, so it escalates). Zombies hurt NPCs back: adjacent zombies claw and **grab** them, with player-style flinch and held-struggle reactions, and can kill them. The overwhelm rule is 1 living NPC per 4 zombies within a 5-tile radius: worse odds and they break off and run from the mob — except the rare last-stander (~5% of civilians, ~10% of thugs, ~15% of militia) who plants their feet and fights to the end.
 - **Survivors & traders** — neutral NPCs wander the world. Right-click a survivor to talk (they drop rumours, including militia base warnings); right-click a trader to open a barter window and trade your goods against their stock, valued item-for-item.
 - **Persistence** — every NPC is a record in global mod data. NPCs near players are fully simulated ("live"); distant ones are *virtualised* — despawned but still travelling the map abstractly — and rematerialise when you come near their current position. State survives save/load and server restarts.
 - **Multiplayer compatible** — all AI, combat, robbery, raid and trade logic runs on the server; clients only render speech/UI and send trade proposals, which the server validates (no client-side item forging). The same server code runs in-process in single player, so SP and MP share one code path.
@@ -34,7 +35,13 @@ sync (zombies already sync). Consequences you should know about:
   cleanly. Attack outcomes are still simulated server-side (hit rolls,
   gunshot sounds and noise that attracts zombies, body-part damage through
   `BodyDamage`); the animations are the visual layer on top.
-- NPCs read as zombies to some vanilla systems (e.g. kill counts).
+- NPCs read as zombies to some vanilla systems (e.g. kill counts), and the
+  engine never makes real zombies attack them on their own — so the
+  living-vs-dead fight is driven by the mod: NPCs damage zombie engine
+  health directly, while a threat scan (~1/s per NPC) makes adjacent
+  zombies claw/grab the NPC (through the same damage path players' weapons
+  use against NPCs) and lures the crowd onto them so hordes physically
+  converge.
 - **Warning shouts:** every fresh bandit engagement opens with a shouted
   warning ("Drop your weapon, NOW!") and a ~2.5 second hold during which no
   damage is dealt — gunners stand and aim, melee bandits close in without

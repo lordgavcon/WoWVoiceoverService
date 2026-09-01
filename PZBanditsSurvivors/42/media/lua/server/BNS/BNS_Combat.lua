@@ -92,6 +92,35 @@ function BNS.Combat.attack(zombie, brain, player)
     end
 end
 
+-- NPC vs zombie: same swing/shot pacing and noise as anti-player
+-- combat, but no warning gate or first-shot penalty (the dead don't
+-- get warnings and don't dodge), and damage lands on the zombie's
+-- engine health so kills go through normal zombie death.
+function BNS.Combat.attackZombie(npc, brain, target)
+    brain.attackTimer = (brain.attackTimer or 0) - 1
+    if brain.attackTimer > 0 then return end
+    local w = brain.weapon or {}
+    local d = BNS.dist(npc:getX(), npc:getY(), target:getX(), target:getY())
+    if w.gun then
+        brain.attackTimer = ZombRand(90, 180)
+        if d > (w.range or 8) then return end
+        BNS.Anim.pulse(npc, brain, "shoot")
+        npc:playSound(w.sound or "9mmShot")
+        addSound(npc, npc:getX(), npc:getY(), npc:getZ(), 70, 70)
+        if ZombRand(100) < math.min((w.hit or 40) + 25, 90) then
+            target:setHealth(math.max(target:getHealth() - (w.dmg or 0.3) * 2, 0))
+        end
+    else
+        brain.attackTimer = 60
+        if d > (w.range or 1.3) then return end
+        BNS.Anim.pulse(npc, brain, "swing")
+        npc:playSound("BaseballBatHit")
+        if ZombRand(100) < 85 then
+            target:setHealth(math.max(target:getHealth() - (w.dmg or 0.1) * 2, 0))
+        end
+    end
+end
+
 -- Players (and zombies) hurting NPCs: shells keep engine health, but we
 -- track brain.health so tiers can differ in toughness and records can
 -- persist wounds. Called from OnHitZombie-style hooks in BNS_Brain.

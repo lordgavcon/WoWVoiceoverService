@@ -11,6 +11,7 @@ if isClient() then return end
 
 require "BNS/BNS_Core"
 require "BNS/BNS_Loadouts"
+require "BNS/BNS_Archetypes"
 require "BNS/BNS_Persistence"
 require "BNS/BNS_Anim"
 
@@ -18,17 +19,23 @@ BNS.Spawner = {}
 
 -- Weapon selection ------------------------------------------------------
 
-function BNS.Spawner.rollWeapon(tier)
+function BNS.Spawner.rollWeapon(tier, archetype)
     local opts = BNS.Options()
-    local guns = BNS.Loadouts.Guns[tier]
+    local def = BNS.Archetypes.get(archetype)
+
+    local guns = def and def.guns or BNS.Loadouts.Guns[tier]
     local gunChance = 0
-    if tier == BNS.Tier.MILITIA then gunChance = opts.militiaGunChance
+    if def then
+        gunChance = def.gunChance == "sandbox" and opts.militiaGunChance or (def.gunChance or 0)
+    elseif tier == BNS.Tier.MILITIA then gunChance = opts.militiaGunChance
     elseif tier == BNS.Tier.THUG then gunChance = 15 end
+
     if guns and ZombRand(100) < gunChance then
         local g = BNS.Loadouts.pick(guns)
         return { item = g.item, dmg = g.dmg, range = g.range, gun = true, sound = g.sound, hit = g.hit }
     end
-    local m = BNS.Loadouts.pick(BNS.Loadouts.Melee[tier] or BNS.Loadouts.Melee[BNS.Tier.CIVILIAN])
+    local melee = def and def.melee or BNS.Loadouts.Melee[tier] or BNS.Loadouts.Melee[BNS.Tier.CIVILIAN]
+    local m = BNS.Loadouts.pick(melee)
     return { item = m.item, dmg = m.dmg, range = m.range, gun = false }
 end
 
@@ -36,7 +43,9 @@ end
 
 local function pickOutfit(rec)
     local pool
-    if rec.role == BNS.Role.BANDIT then pool = BNS.Loadouts.Outfits[rec.tier]
+    local def = BNS.Archetypes.get(rec.archetype)
+    if def then pool = def.outfits
+    elseif rec.role == BNS.Role.BANDIT then pool = BNS.Loadouts.Outfits[rec.tier]
     elseif rec.role == BNS.Role.TRADER then pool = BNS.Loadouts.Outfits.trader
     else pool = BNS.Loadouts.Outfits.survivor end
     return BNS.Loadouts.pick(pool) or "Generic01"
@@ -63,6 +72,7 @@ function BNS.Spawner.materialise(rec)
         id = rec.id,
         role = rec.role,
         tier = rec.tier,
+        archetype = rec.archetype,
         name = rec.name,
         program = rec.program or BNS.Program.WANDER,
         targetX = rec.targetX,
@@ -124,19 +134,16 @@ local function pickSpawnSquare(player)
     return nil
 end
 
-local function rollBanditTier(opts)
-    local r = ZombRand(100)
-    if opts.militia and r < 20 then return BNS.Tier.MILITIA end
-    if r < 55 then return BNS.Tier.CIVILIAN end
-    return BNS.Tier.THUG
-end
-
--- Spawn a bandit (militia spawn as a squad of 2-4) near the player.
+-- Spawn a bandit group near the player. The archetype is rolled from
+-- the spawn location's environment (farm country → farmers, towns →
+-- city folk/police/firefighters, military sites → ex-military), and
+-- the whole squad shares it.
 function BNS.Spawner.spawnBanditNear(player)
     local x, y = pickSpawnSquare(player)
     if not x then return end
-    local opts = BNS.Options()
-    local tier = rollBanditTier(opts)
+    local archetype = BNS.Archetypes.roll(x, y)
+    local def = BNS.Archetypes.get(archetype)
+    local tier = def and def.tier or BNS.Tier.CIVILIAN
     local squadSize = 1
     local squadId = nil
     if tier == BNS.Tier.MILITIA then
@@ -149,10 +156,12 @@ function BNS.Spawner.spawnBanditNear(player)
     for i = 1, squadSize do
         local rec = BNS.Persistence.newRecord(BNS.Role.BANDIT, tier, x + ZombRand(-2, 3), y + ZombRand(-2, 3), 0)
         rec.squad = squadId
-        rec.weapon = BNS.Spawner.rollWeapon(tier)
+        rec.archetype = archetype
+        rec.weapon = BNS.Spawner.rollWeapon(tier, archetype)
         BNS.Spawner.materialise(rec)
     end
-    BNS.log("spawned bandit group tier=" .. tier .. " size=" .. squadSize .. " at " .. x .. "," .. y)
+    BNS.log("spawned bandit group archetype=" .. archetype .. " tier=" .. tier
+        .. " size=" .. squadSize .. " at " .. x .. "," .. y)
 end
 
 -- Spawn a neutral survivor or trader near the player.

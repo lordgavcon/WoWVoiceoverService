@@ -14,6 +14,7 @@ if isClient() then return end
 require "BNS/BNS_Core"
 require "BNS/BNS_POIs"
 require "BNS/BNS_Loadouts"
+require "BNS/BNS_Archetypes"
 require "BNS/BNS_Persistence"
 require "BNS/BNS_Spawner"
 
@@ -52,14 +53,18 @@ end
 
 function BNS.Bases.createGarrison(state, poi)
     local squadId = "garrison_" .. poi.name
+    -- Garrison flavour follows the POI's surroundings (near military
+    -- sites that means ex-military; the tier stays militia-grade).
+    local archetype = BNS.Archetypes.roll(poi.x, poi.y, BNS.Tier.MILITIA)
     local n = ZombRand(3, 6)
     for i = 1, n do
         local rec = BNS.Persistence.newRecord(BNS.Role.BANDIT, BNS.Tier.MILITIA,
             poi.x + ZombRand(-3, 4), poi.y + ZombRand(-3, 4), poi.z or 0)
         rec.squad = squadId
+        rec.archetype = archetype
         rec.home = { x = poi.x, y = poi.y, radius = poi.radius }
         rec.program = BNS.Program.DEFEND
-        rec.weapon = BNS.Spawner.rollWeapon(BNS.Tier.MILITIA)
+        rec.weapon = BNS.Spawner.rollWeapon(BNS.Tier.MILITIA, archetype)
     end
 end
 

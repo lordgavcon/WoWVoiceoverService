@@ -2,10 +2,15 @@
 
 Adds persistent, world-navigating human NPCs to Build 42.20+:
 
-- **Bandits** in three tiers:
-  - **Civilians** — desperate people with planks, kitchen knives and rolling pins. They prefer robbing you (hand over some items and they leave) to fighting, and they break and run when hurt.
-  - **Thugs** — organised muggers with real melee weapons and the occasional pistol; sometimes travel in pairs.
+- **Bandits** in three behaviour tiers:
+  - **Civilians** — desperate people with makeshift weapons. They prefer robbing you (hand over some items and they leave) to fighting, and they break and run when hurt.
+  - **Thugs** — organised fighters with real melee weapons and the occasional firearm; sometimes travel in pairs.
   - **Rogue militia** — squads of 2–5 with firearms. They attack on sight, launch raids on player bases, and garrison fortified strongholds.
+- **Environment-themed bandit groups** — who you meet depends on where you are, weighted by proximity rather than locked to regions (every archetype has a baseline chance everywhere):
+  - **Farm country & wilderness** → farmers with wood axes, pitchforks, shovels and shotguns ("Get off my land!").
+  - **Towns & trailer parks** → city folk with kitchen knives, street thugs, rogue **police** with pistols/shotguns and nightsticks ("Police! Weapon on the ground, NOW!"), and **firefighters** swinging fire axes and sledgehammers.
+  - **Military sites** (secret base, highway checkpoints/blockades — see `BNS_POIs.lua`) → **ex-military** squads in camo with rifles, with the pull fading linearly out to each site's radius.
+  Raid squads and POI garrisons are themed the same way, based on where the base sits.
 - **Base raids & sabotage** — bandit squads periodically march on player bases (MP safehouses are detected directly; elsewhere the mod learns where you spend your time). Raiders smash barricades and player-built walls, shut down and damage generators, and steal from your containers before withdrawing.
 - **Fortified points of interest** — the militia claims a configurable number of known locations (fire stations, gas stations, warehouses, gun stores across Rosewood, Muldraugh, West Point, Riverside, March Ridge…). Claimed POIs get barricaded windows/doors, supply-stocked containers (food, ammo, meds, fuel, building materials) and a standing garrison. Clear the garrison and the supplies are yours.
 - **Survivors & traders** — neutral NPCs wander the world. Right-click a survivor to talk (they drop rumours, including militia base warnings); right-click a trader to open a barter window and trade your goods against their stock, valued item-for-item.
@@ -67,7 +72,9 @@ clients.
 ```
 42/media/lua/
   shared/BNS/   BNS_Core (namespace/helpers) · BNS_Loadouts (tiers, weapons,
-                loot, trader stock, barter values) · BNS_POIs (stronghold list)
+                loot, trader stock, barter values) · BNS_Archetypes
+                (environment-themed bandit types + zone/proximity weighting) ·
+                BNS_POIs (stronghold list + military sites)
   server/BNS/   BNS_Persistence (records, virtualisation) · BNS_Spawner
                 (shell (de)materialisation, squads, loot drops) · BNS_Combat
                 (simulated melee/gunfire) · BNS_Programs (wander/approach/rob/
@@ -92,6 +99,14 @@ clients.
 - Animation variables are set server-side; if they turn out not to sync to
   MP clients on 42.20, a client-side mirror pass fed by a periodic server
   broadcast is the planned fallback.
+- Environment detection reads the map's meta-grid zone types (Farm,
+  TownZone, Forest…); if zone lookup fails it falls back to the baseline
+  weights. Military site coordinates in `BNS_POIs.lua` are approximate —
+  adjust them if ex-military squads cluster in the wrong place, and append
+  entries for map mods. Outfit names (`Police`, `Fireman`, `Ghillie`…) and
+  item ids (`Base.GardenFork`, `Base.WoodAxe`…) should be verified against
+  42.20's scripts if a specific archetype spawns in default clothes or
+  bare-handed.
 - NPCs don't loot buildings for themselves, use vehicles, or fight zombies
   intelligently (they rely on toughness).
 - Trader stock doesn't restock over time yet.

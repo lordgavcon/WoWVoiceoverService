@@ -9,6 +9,7 @@
 if isClient() then return end
 
 require "BNS/BNS_Core"
+require "BNS/BNS_Archetypes"
 require "BNS/BNS_Combat"
 require "BNS/BNS_Anim"
 
@@ -160,6 +161,8 @@ end
 -- before the first shot or swing. The timer itself counts down every
 -- engine tick in BNS_Brain.
 local function warnLine(brain)
+    local def = BNS.Archetypes.get(brain.archetype)
+    if def and def.warn then return getText(def.warn) end
     if brain.tier == BNS.Tier.MILITIA then return getText("UI_BNS_WarnMilitia") end
     if brain.tier == BNS.Tier.THUG then return getText("UI_BNS_WarnThug") end
     return getText("UI_BNS_WarnCivilian")

@@ -22,3 +22,14 @@ BNS.POIs = {
     { name = "Dixie Trailer Park",        x = 10919, y = 10102, z = 0, radius = 12 },
     { name = "Valley Station Mall Lot",   x = 12876, y = 4954,  z = 0, radius = 16 },
 }
+
+-- Military sites: bandit spawns near these lean heavily ex-military,
+-- fading out to the given radius (tiles). Coordinates are approximate
+-- centres of the vanilla Knox Country military locations — adjust or
+-- extend freely (map mods can just append to this table).
+BNS.MilitaryZones = {
+    { name = "Secret Military Base",           x = 4432,  y = 10786, radius = 600 },
+    { name = "Louisville Military Blockade",   x = 12650, y = 2100,  radius = 400 },
+    { name = "Valley Station Hwy Checkpoint",  x = 13860, y = 5430,  radius = 350 },
+    { name = "Knox Bridge Checkpoint",         x = 9250,  y = 7200,  radius = 300 },
+}

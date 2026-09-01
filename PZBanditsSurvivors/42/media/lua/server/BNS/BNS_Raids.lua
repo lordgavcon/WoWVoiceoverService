@@ -11,6 +11,7 @@
 if isClient() then return end
 
 require "BNS/BNS_Core"
+require "BNS/BNS_Archetypes"
 require "BNS/BNS_Persistence"
 require "BNS/BNS_Spawner"
 require "BNS/BNS_Programs"
@@ -78,6 +79,9 @@ function BNS.Raids.launchRaid(baseRec)
     local tier = (opts.militia and ZombRand(100) < 50) and BNS.Tier.MILITIA or BNS.Tier.THUG
     local size = tier == BNS.Tier.MILITIA and ZombRand(3, 6) or ZombRand(2, 4)
     local squadId = "raid_" .. tostring(ZombRand(100000))
+    -- Raiders come themed to the base's region (police/thugs near towns,
+    -- ex-military near military country).
+    local archetype = BNS.Archetypes.roll(baseRec.x, baseRec.y, tier)
 
     -- Stage the squad a few hundred tiles out so they arrive on foot.
     local angle = ZombRandFloat(0, 2 * math.pi)
@@ -88,7 +92,8 @@ function BNS.Raids.launchRaid(baseRec)
         local rec = BNS.Persistence.newRecord(BNS.Role.BANDIT, tier,
             sx + ZombRand(-3, 4), sy + ZombRand(-3, 4), 0)
         rec.squad = squadId
-        rec.weapon = BNS.Spawner.rollWeapon(tier)
+        rec.archetype = archetype
+        rec.weapon = BNS.Spawner.rollWeapon(tier, archetype)
         rec.program = BNS.Program.RAID
         rec.targetX, rec.targetY = baseRec.x, baseRec.y
         rec.raid = { x = baseRec.x, y = baseRec.y, loot = 0 }

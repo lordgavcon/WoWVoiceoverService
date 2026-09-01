@@ -1,0 +1,6 @@
+name=Bandits & Survivors (B42)
+id=PZBanditsSurvivors
+description=Adds persistent, world-navigating human NPCs to Build 42: bandits ranging from desperate civilians with makeshift weapons up to rogue militia squads that rob players, raid and sabotage bases, and fortify points of interest into supply-stocked strongholds. Also adds neutral survivors and traders you can barter with. Server-authoritative AI, multiplayer compatible.
+poster=poster.png
+require=
+versionMin=42.0

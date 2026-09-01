@@ -60,6 +60,7 @@ function BNS.Options()
         traders          = BNS.SV("TradersEnabled", true),
         robbery          = BNS.SV("RobberyEnabled", true),
         damageMult       = BNS.SV("NPCDamageMultiplier", 1.0),
+        doorDelay        = BNS.SV("DoorOpenDelay", 3),
     }
 end
 
